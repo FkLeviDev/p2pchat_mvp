@@ -1,0 +1,228 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap');
+
+@import "tailwindcss";
+
+/* ── Design tokens ─────────────────────────────────────────── */
+@theme {
+  /* Surfaces */
+  --color-sidebar:  #f4f4f5;
+  --color-main:     #ffffff;
+  --color-border:   #e4e4e7;
+  --color-border-2: #d4d4d8;
+
+  /* Text */
+  --color-text:     #18181b;
+  --color-muted:    #71717a;
+  --color-subtle:   #a1a1aa;
+
+  /* Accent — Blue */
+  --color-blue:     #2563eb;
+  --color-blue-h:   #1d4ed8;
+  --color-blue-bg:  #eff6ff;
+  --color-blue-border: #bfdbfe;
+
+  /* Accent — Green */
+  --color-green:    #10b981;
+  --color-green-bg: #ecfdf5;
+  --color-green-border: #a7f3d0;
+
+  /* Danger */
+  --color-red:      #ef4444;
+  --color-red-bg:   #fef2f2;
+  --color-red-border: #fecaca;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+/* ── Base ──────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  background: var(--color-sidebar);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar        { width: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--color-border-2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-muted); }
+
+/* ── Keyframes ─────────────────────────────────────────────── */
+@keyframes slide-up  { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes fade-in   { from { opacity: 0; } to { opacity: 1; } }
+@keyframes blink     { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+/* ── Utilities ─────────────────────────────────────────────── */
+@layer utilities {
+  .slide-up { animation: slide-up 0.2s ease forwards; }
+  .fade-in  { animation: fade-in  0.25s ease forwards; }
+
+  .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--color-green); }
+  .dot-blue  { width: 8px; height: 8px; border-radius: 50%; background: var(--color-blue); animation: blink 1s step-end infinite; }
+  .dot-gray  { width: 8px; height: 8px; border-radius: 50%; background: var(--color-border-2); }
+}
+
+/* ── Components ────────────────────────────────────────────── */
+@layer components {
+
+  /* Primary button (blue) */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 10px 20px;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 600;
+    color: #ffffff;
+    background: var(--color-blue);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .btn-primary:hover   { background: var(--color-blue-h); }
+  .btn-primary:active  { background: #1e40af; }
+  .btn-primary:disabled {
+    background: var(--color-border);
+    color: var(--color-subtle);
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+
+  /* Secondary / ghost button */
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 18px;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-text);
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .btn-secondary:hover   { background: var(--color-sidebar); border-color: var(--color-border-2); }
+  .btn-secondary:disabled { opacity: 0.4; cursor: not-allowed; pointer-events: none; }
+
+  /* Danger ghost */
+  .btn-danger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 9px 18px;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--color-red);
+    background: #ffffff;
+    border: 1px solid var(--color-red-border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .btn-danger:hover { background: var(--color-red-bg); }
+
+  /* Icon button */
+  .btn-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    color: var(--color-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .btn-icon:hover { background: var(--color-border); color: var(--color-text); }
+
+  /* Input */
+  .input {
+    width: 100%;
+    padding: 11px 14px;
+    font-family: var(--font-sans);
+    font-size: 15px;
+    color: var(--color-text);
+    background: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .input::placeholder  { color: var(--color-subtle); }
+  .input:focus         {
+    border-color: var(--color-blue);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+  .input:disabled { background: var(--color-sidebar); color: var(--color-muted); cursor: not-allowed; }
+
+  /* Small section label */
+  .label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-subtle);
+  }
+
+  /* Info / ID display box */
+  .id-box {
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    color: var(--color-blue);
+    background: var(--color-blue-bg);
+    border: 1px solid var(--color-blue-border);
+    border-radius: 7px;
+    padding: 8px 12px;
+    truncate: true;
+    user-select: all;
+    letter-spacing: 0.02em;
+  }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 99px;
+  }
+  .badge-green {
+    color: #065f46;
+    background: var(--color-green-bg);
+    border: 1px solid var(--color-green-border);
+  }
+  .badge-blue {
+    color: #1e3a8a;
+    background: var(--color-blue-bg);
+    border: 1px solid var(--color-blue-border);
+  }
+}
