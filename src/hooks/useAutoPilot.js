@@ -124,15 +124,7 @@ async function triggerReply(history, sendMessage, timerRef) {
       'kérdés', 'sajnálom', 'elnézést', 'asszisztens', 'mesterséges intelligencia'
     ];
 
-    // Csak az első mondatot / tagmondatot tartjuk meg a vesszőnél vagy gondolatjelnél elvágva
-    if (reply.includes(',')) {
-      reply = reply.split(',')[0];
-    }
-    if (reply.includes('-')) {
-      reply = reply.split('-')[0];
-    }
-
-    // Tisztítás: kisbetűsítés és írásjelek leszedése
+    // Tisztítás: kisbetűsítés és írásjelek leszedése a mondat végéről / belsejéből
     reply = reply
       .toLowerCase()
       .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
