@@ -10,7 +10,7 @@ export default function MessageInput() {
   const canSend = canType && draft.trim().length > 0;
 
   return (
-    <div className="shrink-0 bg-white border-t border-[#e4e4e7] px-5 py-3.5">
+    <div className="shrink-0 bg-white border-t border-[#e4e4e7] px-4 py-4 sm:px-6">
       <div className="flex items-center gap-3">
         <input
           ref={inputRef}
@@ -19,18 +19,19 @@ export default function MessageInput() {
           onChange={updateDraft}
           onKeyDown={handleKeyDown}
           disabled={!canType}
-          placeholder={canType ? 'Type a message…' : 'Join a room to start chatting'}
+          placeholder={canType ? 'Write a secure message…' : 'Establish a P2P node session to start typing'}
           maxLength={2000}
           spellCheck={false}
           autoComplete="off"
-          className="flex-1 bg-[#f4f4f5] border border-[#e4e4e7] rounded-xl px-4 py-3 text-[16px] text-[#18181b] placeholder:text-[#a1a1aa] outline-none transition-all focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/10 focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex-1 input-premium !py-3 !px-4 text-[14.5px] disabled:bg-[#f4f4f5] disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
           onClick={commitPacket}
           disabled={!canSend}
-          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all bg-[#2563eb] text-white hover:bg-[#1d4ed8] active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#2563eb]"
+          className="btn-premium-primary !p-3 shrink-0 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          title="Send packet"
         >
-          <Send size={16} />
+          <Send size={15} />
         </button>
       </div>
     </div>

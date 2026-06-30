@@ -1,5 +1,5 @@
-import { PeerProvider } from './context/PeerContext';
-import { usePeer } from './context/PeerContext';
+import { PeerProvider, usePeer } from './context/PeerContext';
+import { useAutoPilot } from './hooks/useAutoPilot';
 import SetupScreen from './components/SetupScreen';
 import Dashboard from './components/layout/Dashboard';
 import ConnectionPanel from './components/chat/ConnectionPanel';
@@ -16,7 +16,18 @@ export default function App() {
 
 function Router() {
   const { peerReady } = usePeer();
+
+  // ── AutoPilot is only loaded locally if the environment variable is explicitly set to true.
+  //    This ensures the Vercel production build remains completely untouched.
+  const isLocalAutopilotEnabled = import.meta.env.VITE_ENABLE_AUTOPILOT === 'true';
+  
+  if (isLocalAutopilotEnabled) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useAutoPilot();
+  }
+
   if (!peerReady) return <SetupScreen />;
+
   return (
     <Dashboard
       sidebar={<ConnectionPanel />}
