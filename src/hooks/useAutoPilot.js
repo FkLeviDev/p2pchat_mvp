@@ -182,12 +182,11 @@ async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPi
     const randomBaseDelay = 1000 + Math.random() * 1200;
     const randomMsPerChar = 90 + Math.random() * 60;
 
-    // If we are in a connected voice call, bypass the typing delay so the response starts immediately!
-    const isVoiceCall = (callStatus === 'connected' && isAutoPilotVoice);
-    const delay = isVoiceCall ? 100 : (randomBaseDelay + reply.length * randomMsPerChar);
+    // Set artificial delay to 0 to make responses 100% instant!
+    const delay = 0;
 
     console.log(
-      `%c[AutoPilot] ✍️  Will send in ${(delay / 1000).toFixed(1)}s (thinking: ${(randomBaseDelay / 1000).toFixed(1)}s, typing speed: ${Math.round(randomMsPerChar)}ms/char): "${reply}"`,
+      `%c[AutoPilot] ✍️  Will send immediately (delay: 0s): "${reply}"`,
       'color: #8b5cf6; font-weight: 500;'
     );
 
