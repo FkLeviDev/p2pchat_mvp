@@ -1,6 +1,6 @@
 import { usePeer } from '../../context/PeerContext';
 import { useChat } from '../../hooks/useChat';
-import { MessageSquare, ShieldAlert, Cpu } from 'lucide-react';
+import { MessageSquare, ShieldAlert, Cpu, Mic } from 'lucide-react';
 
 export default function DataStream() {
   const { role, members } = usePeer();
@@ -120,13 +120,20 @@ function MessageItem({ msg, showName }) {
 
         {/* Bubble */}
         <div
-          className={`px-4 py-2.5 rounded-2xl text-[14.5px] leading-relaxed break-words shadow-sm border ${
+          className={`px-4 py-2.5 rounded-2xl text-[14.5px] leading-relaxed break-words shadow-sm border flex flex-col ${
             isLocal
               ? 'bg-[#2563eb] text-white border-[#2563eb] rounded-br-none'
               : 'bg-white border-[#e4e4e7] text-[#09090b] rounded-bl-none'
           }`}
         >
-          {msg.text}
+          {msg.isTranscript && (
+            <span className={`inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider mb-1.5 ${
+              isLocal ? 'text-blue-200' : 'text-blue-600'
+            }`}>
+              <Mic size={11} /> Voice Transcript
+            </span>
+          )}
+          <span className={msg.isTranscript ? 'italic' : ''}>{msg.text}</span>
         </div>
 
         {/* Time stamp */}

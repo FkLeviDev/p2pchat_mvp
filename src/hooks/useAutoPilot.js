@@ -1,28 +1,57 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { usePeer } from '../context/PeerContext';
 
 /* ────────────────────────────────────────────────────────────
    CONFIG — change these if needed
    ──────────────────────────────────────────────────────────── */
 const OLLAMA_URL = 'http://localhost:11434/api/chat';
-const OLLAMA_MODEL = 'llama3'; // Updated to Llama 3 (8B) for natural Hungarian grammar
+const OLLAMA_MODEL = 'llama3:latest'; // Default to the 8B model as requested
 const BASE_DELAY_MS = 1500;
 const MS_PER_CHAR = 120;
 
-// Sheldon Cooper + Ryan Reynolds + laza magyar chates stílus keveréke Llama 3-hoz
-const SYSTEM_PROMPT = `Te egy laza, de arrogánsan okos magyar fiú vagy. A stílusod Sheldon Cooper okoskodó lenézése és Ryan Reynolds száraz szarkazmusának a keveréke, de a chates beszédstílusod teljesen hétköznapi, lusta és fiatalos.
+// Sheldon Cooper + Ryan Reynolds + natural, typo-free chates stílus magyarul
+const SYSTEM_PROMPT = `
+Te egy 19-25 év közötti magyar srác vagy, aki egy haver helyett chatel.
 
-Szabályok:
-1. Válaszolj röviden (2-5 szó), csupa kisbetűvel, írásjelek nélkül a mondat végén.
-2. Használj chates szlenget (nemtom, eskü, vágod, ja, aha, mizu, zseniális, gratula).
-3. A válaszod legyen egyszerre okoskodó/szarkasztikus és laza. Ha kérdeznek vagy kérnek valamit, üsd el egy cinikus félmondattal, ami arra utal, hogy a másik ötlete nem túl logikus (pl: zseniális elmélet de kihagyom, ehhez túl okos vagyok, nemtom minek sietni).
-4. Kerüld a szuperhősös vagy túl gyerekes kifejezéseket.`;
+A célod, hogy teljesen természetesnek tűnj, ne úgy, mint egy AI.
+
+Személyiséged:
+- intelligens, gyors észjárású
+- laza, önbizalommal teli
+- néha cinikus vagy szarkasztikus, de nem minden üzenetben
+- szereted finoman szívatni az embereket
+- nem vagy bunkó ok nélkül
+- ha valaki normális, te is normális vagy
+
+Írásstílus és Helyesírás:
+- Mindig magyarul válaszolj.
+- Figyelj a helyesírásra és a helyes nyelvtanra, ne írj értelmetlen vagy kitalált szavakat.
+- A szavak legyenek értelmesek, és mindig tegyél szóközt a szavak közé.
+- Kisbetűkkel írj chates stílusban, de ne írj el szavakat (pl. ne írd hogy "felvegjen", a helyes: "felvegyen").
+- Ne használj felesleges írásjeleket.
+- Rövid válaszokat írj (2-15 szó), de ha a helyzet megkívánja, lehet hosszabb is.
+- Természetes chates nyelvezetet használj.
+- Használhatsz chates szavakat: ja, aha, amúgy, nemtom, vágod, eskü, lol, xd, na, hát, kb.
+- Emojit csak ritkán használj.
+
+Humor és Viselkedés:
+- Száraz, intelligens humor.
+- Enyhe Sheldon Cooper-féle fölényesség és Ryan Reynolds-féle laza visszaszólások.
+- Mindig reagálj arra, amit a másik írt, ne írj regényeket vagy magyarázkodást.
+- Soha ne mondd, hogy AI vagy.
+
+Fontos:
+A cél nem az, hogy minden válasz vicces legyen, hanem hogy úgy hangozzon, mint egy valódi magyar srác Messengeren vagy Discordon.
+`;
 
 /* ────────────────────────────────────────────────────────────
    useAutoPilot
    ──────────────────────────────────────────────────────────── */
 export function useAutoPilot() {
-  const { messages, sendMessage, role } = usePeer();
+  const { 
+    messages, sendMessage, role, 
+    callStatus, isAutoPilotVoice, injectTTSAudio 
+  } = usePeer();
 
   const [isActive, setIsActive] = useState(false);
   const isActiveRef = useRef(false);
@@ -51,22 +80,22 @@ export function useAutoPilot() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  /* ── Watch for new remote messages ────────────────────── */
+  /* ── Watch for new remote messages or transcripts ───────── */
   useEffect(() => {
     if (!messages.length || !role) return;
 
     const lastMsg = messages[messages.length - 1];
 
     if (
-      lastMsg.type === 'chat' &&
+      (lastMsg.type === 'chat' || lastMsg.isTranscript) &&
       !lastMsg.isLocal &&
       lastMsg.id !== lastSeenIdRef.current &&
-      isActiveRef.current
+      (isActiveRef.current || (callStatus === 'connected' && isAutoPilotVoice))
     ) {
       lastSeenIdRef.current = lastMsg.id;
 
       const history = messages
-        .filter(m => m.type === 'chat')
+        .filter(m => m.type === 'chat' || m.isTranscript)
         .slice(-8)
         .map(m => ({
           role: m.isLocal ? 'assistant' : 'user',
@@ -74,14 +103,21 @@ export function useAutoPilot() {
         }));
 
       console.log(
-        `%c[AutoPilot] 💬 Incoming: "${lastMsg.text}"`,
+        `%c[AutoPilot] 💬 Incoming: "${lastMsg.text}" (Transcript: ${!!lastMsg.isTranscript})`,
         'color: #2563eb; font-weight: 500;'
       );
 
-      triggerReply(history, sendMessage, pendingTimerRef);
+      triggerReply(
+        history, 
+        sendMessage, 
+        pendingTimerRef, 
+        callStatus, 
+        isAutoPilotVoice, 
+        injectTTSAudio
+      );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages]);
+  }, [messages, callStatus, isAutoPilotVoice, role]);
 
   useEffect(() => {
     return () => {
@@ -92,7 +128,7 @@ export function useAutoPilot() {
   return { isActive };
 }
 
-async function triggerReply(history, sendMessage, timerRef) {
+async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPilotVoice, injectTTSAudio) {
   try {
     const res = await fetch(OLLAMA_URL, {
       method: 'POST',
@@ -101,7 +137,7 @@ async function triggerReply(history, sendMessage, timerRef) {
         model: OLLAMA_MODEL,
         stream: false,
         options: {
-          temperature: 0.85 // Kicsit magasabb hőmérséklet a változatosabb szarkazmushoz
+          temperature: 0.85
         },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
@@ -124,10 +160,11 @@ async function triggerReply(history, sendMessage, timerRef) {
       'kérdés', 'sajnálom', 'elnézést', 'asszisztens', 'mesterséges intelligencia'
     ];
 
-    // Tisztítás: kisbetűsítés és írásjelek leszedése a mondat végéről / belsejéből
+    // Tisztítás: cserélje le az írásjeleket szóközre, hogy a szavak ne csússzanak egybe, majd collapse szóközök
     reply = reply
       .toLowerCase()
-      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, " ")
+      .replace(/\s+/g, " ")
       .trim();
 
     // AI klisé szűrő és fallback
@@ -159,6 +196,11 @@ async function triggerReply(history, sendMessage, timerRef) {
     timerRef.current = setTimeout(() => {
       sendMessage(reply);
       console.log('%c[AutoPilot] 📤 Sent!', 'color: #10b981; font-weight: bold;');
+      
+      // Ha aktív hanghívásban vagyunk és be van kapcsolva az AI válasz hangban:
+      if (callStatus === 'connected' && isAutoPilotVoice) {
+        injectTTSAudio(reply);
+      }
     }, delay);
 
   } catch (err) {
