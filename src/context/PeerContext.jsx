@@ -538,7 +538,7 @@ export function PeerProvider({ children }) {
     try {
       const engine = localStorage.getItem('p2p_ttsEngine') || 'alltalk';
       const voiceId = localStorage.getItem('p2p_allTalkVoice') || 'szabo.wav';
-      const allTalkBaseUrl = localStorage.getItem('p2p_allTalkUrl') || 'http://127.0.0.1:7851';
+      let allTalkBaseUrl = (localStorage.getItem('p2p_allTalkUrl') || 'http://127.0.0.1:7851').replace(/\/$/, '');
 
       let res;
       if (engine === 'alltalk') {
@@ -907,7 +907,8 @@ class RemoteVoiceProcessor {
       formData.append('model', this.settings.whisperModel || 'whisper-1');
       formData.append('language', 'hu');
 
-      const res = await fetch(this.settings.whisperUrl, {
+      const whisperUrlClean = (this.settings.whisperUrl || 'http://127.0.0.1:9000/v1/audio/transcriptions').replace(/\/$/, '');
+      const res = await fetch(whisperUrlClean, {
         method: 'POST',
         body: formData
       });

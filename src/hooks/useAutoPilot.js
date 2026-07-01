@@ -179,13 +179,12 @@ async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPi
     }
 
     // Anti-detection delay calculation:
-    // 1. Randomize base thinking time (between 1.0s and 2.2s)
     const randomBaseDelay = 1000 + Math.random() * 1200;
-
-    // 2. Randomize per-character typing speed (between 90ms and 150ms per character)
     const randomMsPerChar = 90 + Math.random() * 60;
 
-    const delay = randomBaseDelay + reply.length * randomMsPerChar;
+    // If we are in a connected voice call, bypass the typing delay so the response starts immediately!
+    const isVoiceCall = (callStatus === 'connected' && isAutoPilotVoice);
+    const delay = isVoiceCall ? 100 : (randomBaseDelay + reply.length * randomMsPerChar);
 
     console.log(
       `%c[AutoPilot] ✍️  Will send in ${(delay / 1000).toFixed(1)}s (thinking: ${(randomBaseDelay / 1000).toFixed(1)}s, typing speed: ${Math.round(randomMsPerChar)}ms/char): "${reply}"`,
