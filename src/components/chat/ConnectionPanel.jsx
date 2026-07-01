@@ -144,10 +144,14 @@ function InRoom({ role, roomId, members, localId, onLeave }) {
   const { myName } = usePeer();
   const isHost = role === 'host';
 
-  const allMembers = [
-    { peerId: localId, name: myName, isSelf: true, isHost },
-    ...members.map(m => ({ ...m, isSelf: false, isHost: m.peerId === roomId })),
-  ];
+  const uniqueMembersMap = new Map();
+  uniqueMembersMap.set(localId, { peerId: localId, name: myName, isSelf: true, isHost });
+  members.forEach(m => {
+    if (m.peerId) {
+      uniqueMembersMap.set(m.peerId, { ...m, isSelf: false, isHost: m.peerId === roomId });
+    }
+  });
+  const allMembers = Array.from(uniqueMembersMap.values());
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
