@@ -17,14 +17,8 @@ export default function App() {
 function Router() {
   const { peerReady } = usePeer();
 
-  // ── AutoPilot is only loaded locally if the environment variable is explicitly set to true.
-  //    This ensures the Vercel production build remains completely untouched.
-  const isLocalAutopilotEnabled = import.meta.env.VITE_ENABLE_AUTOPILOT === 'true';
-  
-  if (isLocalAutopilotEnabled) {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useAutoPilot();
-  }
+  // ── AutoPilot is now always loaded, allowing dynamic toggling from settings UI
+  useAutoPilot();
 
   if (!peerReady) return <SetupScreen />;
 

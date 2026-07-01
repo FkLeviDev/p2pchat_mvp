@@ -4,10 +4,6 @@ import { usePeer } from '../context/PeerContext';
 /* ────────────────────────────────────────────────────────────
    CONFIG — change these if needed
    ──────────────────────────────────────────────────────────── */
-const OLLAMA_URL = 'http://localhost:11434/api/chat';
-const OLLAMA_MODEL = 'llama3:latest'; // Default to the 8B model as requested
-const BASE_DELAY_MS = 1500;
-const MS_PER_CHAR = 120;
 
 // Sheldon Cooper + Ryan Reynolds + natural, typo-free chates stílus magyarul
 const SYSTEM_PROMPT = `
@@ -48,9 +44,10 @@ A cél nem az, hogy minden válasz vicces legyen, hanem hogy úgy hangozzon, min
    useAutoPilot
    ──────────────────────────────────────────────────────────── */
 export function useAutoPilot() {
-  const { 
-    messages, sendMessage, role, 
-    callStatus, isAutoPilotVoice, injectTTSAudio 
+  const {
+    messages, sendMessage, role,
+    callStatus, isAutoPilotVoice, injectTTSAudio,
+    ollamaUrl, ollamaModel
   } = usePeer();
 
   const [isActive, setIsActive] = useState(false);
@@ -108,16 +105,18 @@ export function useAutoPilot() {
       );
 
       triggerReply(
-        history, 
-        sendMessage, 
-        pendingTimerRef, 
-        callStatus, 
-        isAutoPilotVoice, 
-        injectTTSAudio
+        history,
+        sendMessage,
+        pendingTimerRef,
+        callStatus,
+        isAutoPilotVoice,
+        injectTTSAudio,
+        ollamaUrl,
+        ollamaModel
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [messages, callStatus, isAutoPilotVoice, role]);
+  }, [messages, callStatus, isAutoPilotVoice, role, ollamaUrl, ollamaModel]);
 
   useEffect(() => {
     return () => {
@@ -128,13 +127,13 @@ export function useAutoPilot() {
   return { isActive };
 }
 
-async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPilotVoice, injectTTSAudio) {
+async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPilotVoice, injectTTSAudio, ollamaUrl, ollamaModel) {
   try {
-    const res = await fetch(OLLAMA_URL, {
+    const res = await fetch(ollamaUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: OLLAMA_MODEL,
+        model: ollamaModel,
         stream: false,
         options: {
           temperature: 0.85
@@ -196,7 +195,7 @@ async function triggerReply(history, sendMessage, timerRef, callStatus, isAutoPi
     timerRef.current = setTimeout(() => {
       sendMessage(reply);
       console.log('%c[AutoPilot] 📤 Sent!', 'color: #10b981; font-weight: bold;');
-      
+
       // Ha aktív hanghívásban vagyunk és be van kapcsolva az AI válasz hangban:
       if (callStatus === 'connected' && isAutoPilotVoice) {
         injectTTSAudio(reply);

@@ -153,6 +153,8 @@ function InRoom({ role, roomId, members, localId, onLeave }) {
     allTalkVoice, updateAllTalkVoice,
     whisperUrl, updateWhisperUrl,
     whisperModel, updateWhisperModel,
+    ollamaUrl, updateOllamaUrl,
+    ollamaModel, updateOllamaModel,
     vadThreshold, updateVadThreshold,
     vadSilenceMs, updateVadSilenceMs
   } = usePeer();
@@ -507,6 +509,40 @@ function InRoom({ role, roomId, members, localId, onLeave }) {
                     className="input-premium text-[12px] !py-1.5"
                   />
                 </div>
+              </div>
+            </div>
+
+            {/* Ollama Settings Card */}
+            <div className="bg-white border border-[#e4e4e7] rounded-2xl p-4 premium-shadow flex flex-col gap-3">
+              <div className="flex items-center gap-2 pb-1 border-b border-[#f4f4f5]">
+                <Brain size={14} className="text-[#2563eb]" />
+                <span className="text-[12px] font-bold text-[#09090b] uppercase tracking-wider">AI Brain (Ollama)</span>
+              </div>
+
+              {/* Ollama Server URL */}
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="text-[11px] font-bold text-[#71717a] uppercase">Ollama Server URL</label>
+                <input
+                  type="text"
+                  value={ollamaUrl}
+                  onChange={(e) => updateOllamaUrl(e.target.value)}
+                  placeholder="http://127.0.0.1:11434/api/chat"
+                  className="input-premium font-mono text-[12px] !py-2"
+                  spellCheck={false}
+                />
+              </div>
+
+              {/* Ollama Model */}
+              <div className="flex flex-col gap-1.5 text-left">
+                <label className="text-[11px] font-bold text-[#71717a] uppercase">Model Name</label>
+                <input
+                  type="text"
+                  value={ollamaModel}
+                  onChange={(e) => updateOllamaModel(e.target.value)}
+                  placeholder="qwen2.5:14b-instruct"
+                  className="input-premium font-mono text-[12px] !py-2"
+                  spellCheck={false}
+                />
               </div>
             </div>
           </div>

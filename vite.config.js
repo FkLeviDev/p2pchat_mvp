@@ -11,6 +11,45 @@ export default defineConfig({
       name: 'tts-proxy',
       configureServer(server) {
         server.middlewares.use(async (req, res, next) => {
+          /* ── Whisper STT Proxy ─────────────────────────────────── */
+          if (req.url && req.url.startsWith('/api/whisper')) {
+            const urlObj = new URL(req.url, 'http://localhost');
+            const targetUrl = urlObj.searchParams.get('whisperUrl') || 'http://127.0.0.1:9000/v1/audio/transcriptions';
+            
+            try {
+              const chunks = [];
+              req.on('data', chunk => chunks.push(chunk));
+              req.on('end', async () => {
+                const bodyBuffer = Buffer.concat(chunks);
+                const contentType = req.headers['content-type'] || '';
+                
+                const response = await fetch(targetUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': contentType
+                  },
+                  body: bodyBuffer
+                });
+                
+                if (!response.ok) {
+                  res.statusCode = response.status;
+                  res.end(await response.text());
+                  return;
+                }
+                
+                const data = await response.arrayBuffer();
+                res.setHeader('Content-Type', 'application/json');
+                res.end(Buffer.from(data));
+              });
+              return;
+            } catch (e) {
+              res.statusCode = 500;
+              res.end(e.message);
+              return;
+            }
+          }
+
+          /* ── TTS Proxy ─────────────────────────────────────────── */
           if (req.url && req.url.startsWith('/api/tts')) {
             const urlObj = new URL(req.url, 'http://localhost');
             const text = urlObj.searchParams.get('text') || '';

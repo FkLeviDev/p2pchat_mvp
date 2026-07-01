@@ -72,16 +72,22 @@ export function PeerProvider({ children }) {
     return localStorage.getItem('p2p_ttsEngine') || 'alltalk';
   });
   const [allTalkUrl, setAllTalkUrl] = useState(() => {
-    return localStorage.getItem('p2p_allTalkUrl') || 'http://localhost:7851';
+    return localStorage.getItem('p2p_allTalkUrl') || 'http://127.0.0.1:7851';
   });
   const [allTalkVoice, setAllTalkVoice] = useState(() => {
     return localStorage.getItem('p2p_allTalkVoice') || 'szabo.wav';
   });
   const [whisperUrl, setWhisperUrl] = useState(() => {
-    return localStorage.getItem('p2p_whisperUrl') || 'http://localhost:9000/v1/audio/transcriptions';
+    return localStorage.getItem('p2p_whisperUrl') || 'http://127.0.0.1:9000/v1/audio/transcriptions';
   });
   const [whisperModel, setWhisperModel] = useState(() => {
     return localStorage.getItem('p2p_whisperModel') || 'whisper-1';
+  });
+  const [ollamaUrl, setOllamaUrl] = useState(() => {
+    return localStorage.getItem('p2p_ollamaUrl') || 'http://127.0.0.1:11434/api/chat';
+  });
+  const [ollamaModel, setOllamaModel] = useState(() => {
+    return localStorage.getItem('p2p_ollamaModel') || 'qwen2.5:14b-instruct';
   });
   const [vadThreshold, setVadThreshold] = useState(() => {
     const val = localStorage.getItem('p2p_vadThreshold');
@@ -441,6 +447,14 @@ export function PeerProvider({ children }) {
     setWhisperModel(val);
     localStorage.setItem('p2p_whisperModel', val);
   }, []);
+  const updateOllamaUrl = useCallback((val) => {
+    setOllamaUrl(val);
+    localStorage.setItem('p2p_ollamaUrl', val);
+  }, []);
+  const updateOllamaModel = useCallback((val) => {
+    setOllamaModel(val);
+    localStorage.setItem('p2p_ollamaModel', val);
+  }, []);
 
   const updateVadThreshold = useCallback((val) => {
     setVadThreshold(val);
@@ -508,12 +522,12 @@ export function PeerProvider({ children }) {
       remoteVoiceProcessorRef.current.destroy();
     }
     const settings = {
-      whisperUrl: localStorage.getItem('p2p_whisperUrl') || 'http://localhost:9000/v1/audio/transcriptions',
+      whisperUrl: localStorage.getItem('p2p_whisperUrl') || 'http://127.0.0.1:9000/v1/audio/transcriptions',
       whisperModel: localStorage.getItem('p2p_whisperModel') || 'whisper-1',
       vadThreshold: parseFloat(localStorage.getItem('p2p_vadThreshold') || '0.015'),
       vadSilenceMs: parseInt(localStorage.getItem('p2p_vadSilenceMs') || '1500')
     };
-    remoteVoiceProcessorRef.current = new RemoteVoiceProcessor(rStream, handleRemoteSpeech, settings);
+    remoteVoiceProcessorRef.current = new RemoteVoiceProcessor(audioContextRef.current, rStream, handleRemoteSpeech, settings);
   }, [handleRemoteSpeech]);
 
   const injectTTSAudio = useCallback(async (text) => {
@@ -524,11 +538,17 @@ export function PeerProvider({ children }) {
     try {
       const engine = localStorage.getItem('p2p_ttsEngine') || 'alltalk';
       const voiceId = localStorage.getItem('p2p_allTalkVoice') || 'szabo.wav';
-      const allTalkBaseUrl = localStorage.getItem('p2p_allTalkUrl') || 'http://localhost:7851';
+      const allTalkBaseUrl = localStorage.getItem('p2p_allTalkUrl') || 'http://127.0.0.1:7851';
 
-      const url = `/api/tts?engine=${engine}&voiceId=${encodeURIComponent(voiceId)}&allTalkUrl=${encodeURIComponent(allTalkBaseUrl)}&text=${encodeURIComponent(text)}`;
-      
-      const res = await fetch(url);
+      let res;
+      if (engine === 'alltalk') {
+        const targetUrl = `${allTalkBaseUrl}/api/tts-generate-streaming?text=${encodeURIComponent(text)}&voice=${encodeURIComponent(voiceId)}&language=hu`;
+        res = await fetch(targetUrl);
+      } else {
+        // Google TTS fallback
+        const targetUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=hu&client=tw-ob&q=${encodeURIComponent(text)}`;
+        res = await fetch(targetUrl);
+      }
       if (!res.ok) throw new Error(`TTS HTTP error: ${res.status}`);
       const arrayBuffer = await res.arrayBuffer();
 
@@ -765,6 +785,8 @@ export function PeerProvider({ children }) {
       allTalkVoice, updateAllTalkVoice,
       whisperUrl, updateWhisperUrl,
       whisperModel, updateWhisperModel,
+      ollamaUrl, updateOllamaUrl,
+      ollamaModel, updateOllamaModel,
       vadThreshold, updateVadThreshold,
       vadSilenceMs, updateVadSilenceMs,
 
@@ -785,12 +807,15 @@ export function usePeer() {
    RemoteVoiceProcessor — Local VAD + Whisper Transcription
    ──────────────────────────────────────────────────────────── */
 class RemoteVoiceProcessor {
-  constructor(remoteStream, onSpeechEnd, settings) {
+  constructor(audioContext, remoteStream, onSpeechEnd, settings) {
     this.stream = remoteStream;
     this.onSpeechEnd = onSpeechEnd;
     this.settings = settings;
     
-    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    this.audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+    if (this.audioContext.state === 'suspended') {
+      this.audioContext.resume().catch(e => console.warn('[VAD] Failed to resume AudioContext:', e));
+    }
     this.source = this.audioContext.createMediaStreamSource(this.stream);
     
     this.analyser = this.audioContext.createAnalyser();
@@ -882,7 +907,8 @@ class RemoteVoiceProcessor {
       formData.append('model', this.settings.whisperModel || 'whisper-1');
       formData.append('language', 'hu');
 
-      const res = await fetch(this.settings.whisperUrl, {
+      const proxyUrl = `/api/whisper?whisperUrl=${encodeURIComponent(this.settings.whisperUrl)}`;
+      const res = await fetch(proxyUrl, {
         method: 'POST',
         body: formData
       });
