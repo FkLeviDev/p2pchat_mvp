@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, useCallback } from 'react';
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from 'react';
 import Peer from 'peerjs';
 
 /**
@@ -153,6 +153,10 @@ export function PeerProvider({ children }) {
       setMyName(name.trim());
       myNameRef.current = name.trim();
       setPeerReady(true);
+
+      // Save identity to localStorage
+      localStorage.setItem('p2p_myName', name.trim());
+      localStorage.setItem('p2p_localId', id);
     });
 
     peer.on('connection', (conn) => {
@@ -168,6 +172,8 @@ export function PeerProvider({ children }) {
         setInitError('That ID is already taken. Try a different one.');
         peer.destroy();
         peerRef.current = null;
+        // Clean localStorage if login failed due to taken ID
+        localStorage.removeItem('p2p_localId');
       } else if (!peerReady) {
         setInitError(err.message ?? 'Connection error');
         peer.destroy();
@@ -191,6 +197,10 @@ export function PeerProvider({ children }) {
     setMessages([]);
     setRoomError(null);
     pushSystem('Room created. Share the Room ID with others.');
+
+    // Save active room status to localStorage
+    localStorage.setItem('p2p_activeRole', 'host');
+    localStorage.setItem('p2p_activeRoomId', localIdRef.current);
   }, [pushSystem]);
 
   /* ── PUBLIC: Join room ───────────────────────────────── */
@@ -206,6 +216,10 @@ export function PeerProvider({ children }) {
       setRoomId(targetId.trim());
       setMessages([]);
       conn.send(JSON.stringify({ type: 'join', name: myNameRef.current }));
+
+      // Save active room status to localStorage
+      localStorage.setItem('p2p_activeRole', 'client');
+      localStorage.setItem('p2p_activeRoomId', targetId.trim());
     });
 
     conn.on('data', handleHostData);
@@ -215,6 +229,10 @@ export function PeerProvider({ children }) {
       setRole(null); roleRef.current = null;
       setRoomId(null); setMembers([]); membersRef.current = [];
       hostConnRef.current = null;
+
+      // Clear active room status
+      localStorage.removeItem('p2p_activeRole');
+      localStorage.removeItem('p2p_activeRoomId');
     });
 
     conn.on('error', () => {
@@ -222,6 +240,9 @@ export function PeerProvider({ children }) {
       setRole(null); roleRef.current = null;
       setRoomId(null);
       hostConnRef.current = null;
+      
+      localStorage.removeItem('p2p_activeRole');
+      localStorage.removeItem('p2p_activeRoomId');
     });
   }, [handleHostData, pushSystem]);
 
@@ -256,10 +277,43 @@ export function PeerProvider({ children }) {
     setRole(null); roleRef.current = null;
     setRoomId(null); setMembers([]); membersRef.current = [];
     setMessages([]); setRoomError(null);
+
+    // Clear active room status on leave
+    localStorage.removeItem('p2p_activeRole');
+    localStorage.removeItem('p2p_activeRoomId');
   }, []);
 
   const clearRoomError = useCallback(() => setRoomError(null), []);
   const clearInitError = useCallback(() => setInitError(null), []);
+
+  /* ── AUTO RECOVERY ON PAGE REFRESH (F5) ──────────────── */
+  useEffect(() => {
+    const savedName = localStorage.getItem('p2p_myName');
+    const savedId = localStorage.getItem('p2p_localId');
+    
+    if (savedName && savedId) {
+      // Re-initialize Peer using the saved custom ID & Name
+      initPeer(savedId, savedName);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reconnect to active room after Peer is ready
+  useEffect(() => {
+    if (!peerReady) return;
+    
+    const savedRole = localStorage.getItem('p2p_activeRole');
+    const savedRoomId = localStorage.getItem('p2p_activeRoomId');
+    
+    if (savedRole && savedRoomId) {
+      if (savedRole === 'host') {
+        createRoom();
+      } else if (savedRole === 'client') {
+        joinRoom(savedRoomId);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [peerReady]);
 
   return (
     <PeerContext.Provider value={{
