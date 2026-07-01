@@ -17,26 +17,53 @@ const PeerContext = createContext(null);
 
 export function PeerProvider({ children }) {
   /* ── Identity / peer status ──────────────────────────── */
-  const [localId,    setLocalId]    = useState(null);   // actual peer ID confirmed by relay
-  const [myName,     setMyName]     = useState('');
-  const [peerReady,  setPeerReady]  = useState(false);
-  const [initError,  setInitError]  = useState(null);   // ID taken / relay error at setup
+  const [localId, setLocalId] = useState(null);   // actual peer ID confirmed by relay
+  const [myName, setMyName] = useState('');
+  const [peerReady, setPeerReady] = useState(false);
+  const [initError, setInitError] = useState(null);   // ID taken / relay error at setup
+
+  /* ── ICE / TURN server configuration ────────────────── */
+  const [iceConfig, setIceConfig] = useState(() => {
+    try {
+      const saved = localStorage.getItem('p2p_iceConfig');
+      return saved ? JSON.parse(saved) : {
+        useCustom: false,
+        stunUrls: 'stun:stun.l.google.com:19302\nstun:stun1.l.google.com:19302\nstun:stun2.l.google.com:19302\nstun:stun.services.mozilla.com',
+        turnUrl: '',
+        turnUsername: '',
+        turnCredential: '',
+      };
+    } catch {
+      return {
+        useCustom: false,
+        stunUrls: 'stun:stun.l.google.com:19302\nstun:stun1.l.google.com:19302\nstun:stun2.l.google.com:19302\nstun:stun.services.mozilla.com',
+        turnUrl: '',
+        turnUsername: '',
+        turnCredential: '',
+      };
+    }
+  });
+
+  const updateIceConfig = useCallback((newConfig) => {
+    setIceConfig(newConfig);
+    localStorage.setItem('p2p_iceConfig', JSON.stringify(newConfig));
+  }, []);
 
   /* ── Room state ──────────────────────────────────────── */
-  const [role,      setRole]      = useState(null);     // 'host' | 'client' | null
-  const [roomId,    setRoomId]    = useState(null);
-  const [members,   setMembers]   = useState([]);       // remote peers
-  const [messages,  setMessages]  = useState([]);
+  const [role, setRole] = useState(null);     // 'host' | 'client' | null
+  const [roomId, setRoomId] = useState(null);
+  const [members, setMembers] = useState([]);       // remote peers
+  const [messages, setMessages] = useState([]);
   const [roomError, setRoomError] = useState(null);
 
   /* ── Refs ────────────────────────────────────────────── */
-  const peerRef        = useRef(null);
+  const peerRef = useRef(null);
   const clientConnsRef = useRef({});   // host: { peerId → conn }
-  const hostConnRef    = useRef(null); // client: conn to host
-  const localIdRef     = useRef(null);
-  const myNameRef      = useRef('');
-  const membersRef     = useRef([]);
-  const roleRef        = useRef(null);
+  const hostConnRef = useRef(null); // client: conn to host
+  const localIdRef = useRef(null);
+  const myNameRef = useRef('');
+  const membersRef = useRef([]);
+  const roleRef = useRef(null);
 
   /* ── Helpers ─────────────────────────────────────────── */
   const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -56,6 +83,28 @@ export function PeerProvider({ children }) {
       return next;
     });
   };
+
+  // A helper to monitor ice connection state on a connection
+  const monitorIceState = useCallback((conn, targetName) => {
+    let checkCount = 0;
+    const interval = setInterval(() => {
+      checkCount++;
+      const pc = conn.peerConnection;
+      if (pc) {
+        clearInterval(interval);
+        pc.addEventListener('iceconnectionstatechange', () => {
+          if (pc.iceConnectionState === 'failed') {
+            console.warn(`ICE connection failed for ${targetName}`);
+            pushSystem(`ICE connection failed for ${targetName}. Your network may require a TURN server.`);
+            setRoomError('ICE connection failed. A TURN server may be required (see Network Settings).');
+          }
+        });
+      }
+      if (checkCount > 40) {
+        clearInterval(interval);
+      }
+    }, 250);
+  }, [pushSystem]);
 
   /* ── HOST: broadcast ─────────────────────────────────── */
   const broadcastToClients = useCallback((data, excludeId = null) => {
@@ -143,8 +192,47 @@ export function PeerProvider({ children }) {
     if (peerRef.current) return;
     setInitError(null);
 
-    // PeerJS accepts a custom ID as first arg (undefined = random)
-    const peer = new Peer(desiredId?.trim() || undefined, { debug: 0 });
+    const iceServers = [];
+    if (iceConfig.useCustom) {
+      if (iceConfig.stunUrls) {
+        const urls = iceConfig.stunUrls
+          .split('\n')
+          .map(u => u.trim())
+          .filter(Boolean);
+        if (urls.length > 0) {
+          iceServers.push({ urls });
+        }
+      }
+      if (iceConfig.turnUrl) {
+        const turnServer = {
+          urls: iceConfig.turnUrl.trim(),
+        };
+        if (iceConfig.turnUsername) {
+          turnServer.username = iceConfig.turnUsername.trim();
+        }
+        if (iceConfig.turnCredential) {
+          turnServer.credential = iceConfig.turnCredential.trim();
+        }
+        iceServers.push(turnServer);
+      }
+    } else {
+      iceServers.push({
+        urls: [
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+          'stun:stun.services.mozilla.com'
+        ]
+      });
+    }
+
+    const peer = new Peer(desiredId?.trim() || undefined, {
+      debug: 0,
+      config: {
+        iceServers,
+        sdpSemantics: 'unified-plan',
+      }
+    });
     peerRef.current = peer;
 
     peer.on('open', (id) => {
@@ -161,6 +249,7 @@ export function PeerProvider({ children }) {
 
     peer.on('connection', (conn) => {
       if (roleRef.current === 'host') {
+        monitorIceState(conn, conn.peer?.slice(0, 8) || 'incoming peer');
         wireClientConn(conn);
       } else {
         conn.on('open', () => conn.close());
@@ -186,7 +275,7 @@ export function PeerProvider({ children }) {
     });
 
     peer.on('disconnected', () => { if (!peer.destroyed) peer.reconnect(); });
-  }, [wireClientConn, peerReady]);
+  }, [wireClientConn, peerReady, iceConfig, monitorIceState]);
 
   /* ── PUBLIC: Create room ─────────────────────────────── */
   const createRoom = useCallback(() => {
@@ -210,6 +299,7 @@ export function PeerProvider({ children }) {
 
     const conn = peerRef.current.connect(targetId.trim(), { reliable: true });
     hostConnRef.current = conn;
+    monitorIceState(conn, `host (${targetId.trim().slice(0, 8)})`);
 
     conn.on('open', () => {
       setRole('client'); roleRef.current = 'client';
@@ -240,11 +330,11 @@ export function PeerProvider({ children }) {
       setRole(null); roleRef.current = null;
       setRoomId(null);
       hostConnRef.current = null;
-      
+
       localStorage.removeItem('p2p_activeRole');
       localStorage.removeItem('p2p_activeRoomId');
     });
-  }, [handleHostData, pushSystem]);
+  }, [handleHostData, pushSystem, monitorIceState]);
 
   /* ── PUBLIC: Send message ────────────────────────────── */
   const sendMessage = useCallback((text) => {
@@ -283,6 +373,23 @@ export function PeerProvider({ children }) {
     localStorage.removeItem('p2p_activeRoomId');
   }, []);
 
+  /* ── PUBLIC: Disconnect Node ─────────────────────────── */
+  const disconnectNode = useCallback(() => {
+    leaveRoom();
+    if (peerRef.current) {
+      peerRef.current.destroy();
+      peerRef.current = null;
+    }
+    setLocalId(null);
+    localIdRef.current = null;
+    setMyName('');
+    myNameRef.current = '';
+    setPeerReady(false);
+
+    localStorage.removeItem('p2p_myName');
+    localStorage.removeItem('p2p_localId');
+  }, [leaveRoom]);
+
   const clearRoomError = useCallback(() => setRoomError(null), []);
   const clearInitError = useCallback(() => setInitError(null), []);
 
@@ -290,21 +397,21 @@ export function PeerProvider({ children }) {
   useEffect(() => {
     const savedName = localStorage.getItem('p2p_myName');
     const savedId = localStorage.getItem('p2p_localId');
-    
+
     if (savedName && savedId) {
       // Re-initialize Peer using the saved custom ID & Name
       initPeer(savedId, savedName);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Reconnect to active room after Peer is ready
   useEffect(() => {
     if (!peerReady) return;
-    
+
     const savedRole = localStorage.getItem('p2p_activeRole');
     const savedRoomId = localStorage.getItem('p2p_activeRoomId');
-    
+
     if (savedRole && savedRoomId) {
       if (savedRole === 'host') {
         createRoom();
@@ -312,7 +419,7 @@ export function PeerProvider({ children }) {
         joinRoom(savedRoomId);
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [peerReady]);
 
   return (
@@ -320,6 +427,7 @@ export function PeerProvider({ children }) {
       localId, myName, peerReady, initError, initPeer, clearInitError,
       role, roomId, members, messages, roomError,
       createRoom, joinRoom, sendMessage, leaveRoom, clearRoomError,
+      disconnectNode, iceConfig, updateIceConfig,
     }}>
       {children}
     </PeerContext.Provider>

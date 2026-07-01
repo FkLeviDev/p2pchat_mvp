@@ -7,6 +7,7 @@ export default function ConnectionPanel() {
     localId, role, roomId, members,
     roomError, clearRoomError,
     createRoom, joinRoom, leaveRoom,
+    disconnectNode,
   } = usePeer();
 
   const inRoom = role !== null;
@@ -15,7 +16,7 @@ export default function ConnectionPanel() {
     <div className="flex flex-col h-full bg-[#fafafc]">
       {inRoom
         ? <InRoom role={role} roomId={roomId} members={members} localId={localId} onLeave={leaveRoom} />
-        : <Lobby localId={localId} roomError={roomError} clearError={clearRoomError} onCreate={createRoom} onJoin={joinRoom} />
+        : <Lobby localId={localId} roomError={roomError} clearError={clearRoomError} onCreate={createRoom} onJoin={joinRoom} onDisconnect={disconnectNode} />
       }
     </div>
   );
@@ -24,7 +25,7 @@ export default function ConnectionPanel() {
 /* ═══════════════════════════════════════════════════════════
    LOBBY (Setup Lobby view)
    ═══════════════════════════════════════════════════════════ */
-function Lobby({ localId, roomError, clearError, onCreate, onJoin }) {
+function Lobby({ localId, roomError, clearError, onCreate, onJoin, onDisconnect }) {
   const [tab,    setTab]    = useState('create');
   const [target, setTarget] = useState('');
 
@@ -36,13 +37,25 @@ function Lobby({ localId, roomError, clearError, onCreate, onJoin }) {
     <div className="flex flex-col flex-1 py-4 px-4 overflow-y-auto">
 
       {/* Your Local Node Info Card */}
-      <div className="bg-white border border-[#e4e4e7] rounded-2xl p-4 premium-shadow mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Laptop size={15} className="text-[#2563eb]" />
-          <span className="text-[12px] font-bold text-[#09090b] uppercase tracking-wider">Local Node Status</span>
+      <div className="bg-white border border-[#e4e4e7] rounded-2xl p-4 premium-shadow mb-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Laptop size={15} className="text-[#2563eb]" />
+            <span className="text-[12px] font-bold text-[#09090b] uppercase tracking-wider">Local Node Status</span>
+          </div>
+          <button
+            onClick={onDisconnect}
+            className="text-[10px] font-bold uppercase tracking-wider text-[#ef4444] hover:text-[#dc2626] flex items-center gap-1 transition-colors cursor-pointer"
+            title="Disconnect node and change network settings/identity"
+          >
+            <LogOut size={11} />
+            Shut Down
+          </button>
         </div>
-        <p className="text-[11px] text-[#71717a] mb-2">Share your Peer ID to let friends connect directly to you:</p>
-        <CopyableId value={localId} />
+        <div>
+          <p className="text-[11px] text-[#71717a] mb-2">Share your Peer ID to let friends connect directly to you:</p>
+          <CopyableId value={localId} />
+        </div>
       </div>
 
       {/* Tab Switcher */}
