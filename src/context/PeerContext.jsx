@@ -907,8 +907,7 @@ class RemoteVoiceProcessor {
       formData.append('model', this.settings.whisperModel || 'whisper-1');
       formData.append('language', 'hu');
 
-      const proxyUrl = `/api/whisper?whisperUrl=${encodeURIComponent(this.settings.whisperUrl)}`;
-      const res = await fetch(proxyUrl, {
+      const res = await fetch(this.settings.whisperUrl, {
         method: 'POST',
         body: formData
       });
